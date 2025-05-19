@@ -39,9 +39,16 @@ void triangular_solve(vector<T> const& diag,  vector<T> const& lower, vector<T> 
 }
 
 // TODO Potentiel V(x) :
-double V()
+double V(double x, double xL, double xR, double xa, double xb, double V0, double om0, double m)
 {
-    return 0;
+    if (x >= xL && x <= xa)
+        return 0.5 * m * om0 * om0 * pow((x - xa) / (xL - xa), 2);
+    else if (x >= xa && x <= xb)
+        return V0 * pow(sin(M_PI * (x - xa) / (xb - xa)), 2);
+    else if (x >= xb && x <= xR)
+        return 0.5 * m * om0 * om0 * pow((x - xb) / (xR - xb), 2);
+    else
+        return 1e10;
 }
 
 // Declaration des diagnostiques de la particule d'apres sa fonction d'onde psi :
@@ -56,6 +63,8 @@ double V()
 // TODO: calculer la probabilite de trouver la particule dans un intervalle [x_i, x_j]
 double prob()
 {
+    double p=0.0;
+    
     return 0;
 }
 
@@ -211,7 +220,7 @@ main(int argc, char** argv)
     ofstream fichier_potentiel((output + "_pot.out").c_str());
     fichier_potentiel.precision(15);
     for (int i(0); i < Npoints; ++i)
-        fichier_potentiel << x[i] << " " <<V() << endl;
+        fichier_potentiel << x[i] << " " <<V(x[i] ,xL,xR, xa,xb,  V0,  om0, m) << endl;
     fichier_potentiel.close();
 
     ofstream fichier_psi((output + "_psi2.out").c_str());
