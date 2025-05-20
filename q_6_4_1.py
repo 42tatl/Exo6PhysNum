@@ -22,9 +22,8 @@ params = fct.read_in_file(input_filename)
 
 (tfin, xL, xR, xa, xb, 
 om0, V0, x0, n, sigma_norm, 
-Nsteps, Nintervals, output, verbose) = fct.get_simulation_params(params)
+Nsteps, Nintervals) = fct.get_simulation_params(params)
 
-os.makedirs("outputs", exist_ok=True)
 
 # === Réponse à la question (i) ===
 t_trans = 0.035

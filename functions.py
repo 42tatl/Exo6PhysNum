@@ -24,6 +24,43 @@ def read_in_file(filename):
                     variables[key] = value
     return variables
 
+def run_simulation(executable, input_filename, output_name, **params):
+    '''Runs the simulation with the given parameters'''
+    os.makedirs("outputs", exist_ok=True)
+
+    # Build command
+    cmd = [executable, input_filename]
+    for key, value in params.items():
+        if key != "output":
+            cmd.append(f"{key}={value}")
+    cmd.append(f"output=outputs/{output_name}")
+
+    print("\nRunning command:", " ".join(cmd))
+
+    try:
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        print(result.stdout)
+        print("Command executed successfully")
+
+        # Check for expected output files (.out extensions used in quantum case)
+        expected_files = [
+            f"outputs/{output_name}_pot.out",
+            f"outputs/{output_name}_psi2.out",
+            f"outputs/{output_name}_obs.out"
+        ]
+
+        if all(os.path.exists(f) for f in expected_files):
+            print("All output files created successfully")
+            return True
+        else:
+            missing = [f for f in expected_files if not os.path.exists(f)]
+            print(f"Missing files: {missing}")
+            return False
+
+    except subprocess.CalledProcessError as e:
+        print(f"Command failed with error:\n{e.stderr}")
+        return False
+    
 def get_simulation_params(params):
     '''Extracts all quantum simulation parameters with proper typing'''
 
