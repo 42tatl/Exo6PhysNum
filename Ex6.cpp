@@ -1,3 +1,6 @@
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #include "ConfigFile.tpp"
 #include <chrono>
 #include <cmath>
@@ -62,18 +65,34 @@ double V(double x, double xL, double xR, double xa, double xb, double V0, double
 
 // TODO: calculer la probabilite de trouver la particule dans un intervalle [x_i, x_j]
 //JSP DU TOUT
-double prob(vec_cmplx const& psi, double xi, double xj, double dx)
+double prob(const vec_cmplx& psi, double xi, double xj, double dx, const std::vector<double>& x)
 {
-    double p=0.0;
-    if (??) {
-        for (int i = 0; i < ??; ++i) {
-            p += dx * 0.5 * (norm(psi[i])  + norm(psi[i + 1]) );
+    double p = 0.0;
+
+    // Trouver les indices correspondants à xi et xj
+    size_t i_start = 0;
+    size_t i_end = psi.size() - 1;
+
+    // Cherche l'index de départ (le plus proche de xi)
+    for (size_t i = 0; i < x.size() - 1; ++i) {
+        if (x[i] <= xi && x[i + 1] > xi) {
+            i_start = i;
+            break;
         }
-       
-    }else {
-        for (int i = ??; i < psi.size()-1; ++i) {
-            p += dx * 0.5 * (norm(psi[i])  + norm(psi[i + 1]));
+    }
+
+    // Cherche l'index de fin (le plus proche de xj)
+    for (size_t i = 0; i < x.size() - 1; ++i) {
+        if (x[i] <= xj && x[i + 1] > xj) {
+            i_end = i;
+            break;
         }
+    }
+
+    if (i_start > i_end) std::swap(i_start, i_end);
+
+    for (size_t i = i_start; i < i_end; ++i) {
+        p += 0.5 * dx * (norm(psi[i]) + norm(psi[i + 1]));
     }
 
     return p;
@@ -109,10 +128,8 @@ double xmoy(vec_cmplx const& psi, vector<double> const& x, double dx)
 {
     double xm = 0.0;
     for (size_t i = 0; i < psi.size() - 1; ++i) {
-        double xi = x[i];
-        double xi1 = x[i + 1];
-        complex<double> integrand_i = conj(psi[i]) * xi * psi[i];
-        complex<double> integrand_i1 = conj(psi[i + 1]) * xi1 * psi[i + 1];
+        complex<double> integrand_i = conj(psi[i]) * x[i] * psi[i];
+        complex<double> integrand_i1 = conj(psi[i + 1]) * x[i+1] * psi[i + 1];
         xm += 0.5 * dx * real(integrand_i + integrand_i1);
     return xm;
     }
@@ -123,10 +140,8 @@ double x2moy(vec_cmplx const& psi, vector<double> const& x, double dx)
 {
     double xm2 = 0.0;
     for (size_t i = 0; i < psi.size() - 1; ++i) {
-        double xi = x[i];
-        double xi1 = x[i + 1];
-        complex<double> integrand_i = conj(psi[i]) * xi * xi * psi[i];
-        complex<double> integrand_i1 = conj(psi[i + 1]) * xi1 * xi1 * psi[i + 1];
+        complex<double> integrand_i = conj(psi[i]) * x[i] * x[i] * psi[i];
+        complex<double> integrand_i1 = conj(psi[i + 1]) * x[i+1] * x[i+1] * psi[i + 1];
         xm2 += 0.5 * dx * real(integrand_i + integrand_i1);
     }
     return xm2;
@@ -168,8 +183,9 @@ double p2moy(const vec_cmplx& psi, double dx, double hbar)
 vec_cmplx normalize(const vec_cmplx& psi, const double& dx)
 {
     double norm2 = 0.0;
-    for (size_t i = 0; i < psi.size(); ++i) {
-        norm2 += norm(psi[i]) * dx;  
+
+    for (size_t i = 0; i < psi.size() - 1; ++i) {
+        norm2 += 0.5 * dx * (norm(psi[i]) + norm(psi[i + 1]));
     }
 
     double norm_factor = sqrt(norm2);
@@ -181,7 +197,6 @@ vec_cmplx normalize(const vec_cmplx& psi, const double& dx)
 
     return psi_norm;
 }
-
 
 int main(int argc, char** argv)
 {
@@ -304,7 +319,7 @@ int main(int argc, char** argv)
     ofstream fichier_potentiel((output + "_pot.out").c_str());
     fichier_potentiel.precision(15);
     for (int i(0); i < Npoints; ++i)
-        fichier_potentiel << x[i] << " " <<V(x[i] ,xL,xR, xa,xb,  V0,  om0, m) << endl;
+        fichier_potentiel << x[i] << " " << V(x[i] ,xL,xR, xa,xb,  V0,  om0, m) << endl;
     fichier_potentiel.close();
 
     ofstream fichier_psi((output + "_psi2.out").c_str());
@@ -322,9 +337,15 @@ int main(int argc, char** argv)
     // Ecriture des observables :
     // TODO: introduire les arguments des fonctions prob, E, xmoy, x2moy, pmoy et p2moy
     //       en accord avec la façon dont vous les aurez programmés plus haut
-    fichier_observables << t << " " << prob() << " " << prob()
-                << " " << E(psi, dH, aH, cH, dx) << " " << xmoy (psi, x, dx) << " "  
-                << x2moy(psi, x, dx) << " " << pmoy (psi, dx, hbar) << " " << p2moy(psi, dx, hbar) << endl; 
+    fichier_observables << t
+                    << " " << prob(psi, xL, 0.0, dx, x)
+                    << " " << prob(psi, 0.0, xR, dx, x)
+                    << " " << E(psi, dH, aH, cH, dx)
+                    << " " << xmoy(psi, x, dx)
+                    << " " << x2moy(psi, x, dx)
+                    << " " << pmoy(psi, dx, hbar)
+                    << " " << p2moy(psi, dx, hbar)
+                    << endl;
 
     // Boucle temporelle :    
     while (t < tfin) {
@@ -351,15 +372,18 @@ int main(int argc, char** argv)
         // Ecriture des observables :
 	// TODO: introduire les arguments des fonctions prob, E, xmoy, x2moy, pmoy et p2moy
 	//       en accord avec la façon dont vous les aurez programmés plus haut
-        fichier_observables << t << " " << prob() << " " << prob()
-                    << " " << E(psi, dH, aH, cH, dx) << " " << xmoy () << " "  
-                    << x2moy() << " " << pmoy () << " " << p2moy() << endl; 
+        fichier_observables << t
+                    << " " << prob(psi, xL, 0.0, dx, x)
+                    << " " << prob(psi, 0.0, xR, dx, x)
+                    << " " << E(psi, dH, aH, cH, dx)
+                    << " " << xmoy(psi, x, dx)
+                    << " " << x2moy(psi, x, dx)
+                    << " " << pmoy(psi, dx, hbar)
+                    << " " << p2moy(psi, dx, hbar)
+                    << endl;
 
     } // Fin de la boucle temporelle
-
-
-
-
+    
 
     fichier_observables.close();
     fichier_psi.close();
