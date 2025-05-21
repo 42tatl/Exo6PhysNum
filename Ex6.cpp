@@ -131,8 +131,8 @@ double xmoy(vec_cmplx const& psi, vector<double> const& x, double dx)
         complex<double> integrand_i = conj(psi[i]) * x[i] * psi[i];
         complex<double> integrand_i1 = conj(psi[i + 1]) * x[i+1] * psi[i + 1];
         xm += 0.5 * dx * real(integrand_i + integrand_i1);
-    return xm;
     }
+    return xm;
 }
 
 // TODO calculer x.^2 moyenne
