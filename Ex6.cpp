@@ -148,6 +148,7 @@ double x2moy(vec_cmplx const& psi, vector<double> const& x, double dx)
 }
 
 // TODO calculer p moyenne
+/*
 double pmoy(const vec_cmplx& psi, double dx, double hbar)
 {
     complex<double> complex_i(0.0, 1.0);
@@ -161,9 +162,38 @@ double pmoy(const vec_cmplx& psi, double dx, double hbar)
 
     return dx * result;
 }
+*/
+
+double pmoy(vec_cmplx const& psi, double dx, double hbar)
+{
+    size_t N = psi.size();
+    vec_cmplx dpsi_dx(N, 0.0); // Vecteur pour stocker la dérivée spatiale de psi
+
+    // Calcul de la dérivée spatiale de psi
+    for (size_t i = 1; i < N - 1; ++i) {
+        dpsi_dx[i] = (psi[i + 1] - psi[i - 1]) / (2.0 * dx); // Différences centrées
+    }
+    dpsi_dx[0] = (psi[1] - psi[0]) / dx; // Différences forward pour le bord gauche
+    dpsi_dx[N - 1] = (psi[N - 1] - psi[N - 2]) / dx; // Différences backward pour le bord droit
+
+    // Calcul de la quantité de mouvement moyenne avec la méthode des trapèzes
+    double pmoyenne = 0.0;
+    for (size_t i = 0; i < N - 1; ++i) {
+        // Contribution de chaque segment avec la méthode des trapèzes
+        pmoyenne += 0.5 * dx * (
+            real(conj(psi[i]) * (-complex<double>(0, 1) * hbar * dpsi_dx[i])) +
+            real(conj(psi[i + 1]) * (-complex<double>(0, 1) * hbar * dpsi_dx[i + 1]))
+        );
+    }
+
+    return pmoyenne;
+}
+
 
 
 // TODO calculer p.^2 moyenne
+
+/*
 double p2moy(const vec_cmplx& psi, double dx, double hbar)
 {
     size_t N = psi.size();
@@ -177,7 +207,30 @@ double p2moy(const vec_cmplx& psi, double dx, double hbar)
 
     return dx * result; 
 }
+*/
 
+double p2moy(const vec_cmplx& psi, double dx, double hbar)
+{
+    size_t N = psi.size();
+    std::vector<complex<double>> d2psi(N, 0.0); // dérivée seconde
+
+    // Calcul de la dérivée seconde avec différences finies centrées
+    for (size_t i = 1; i < N - 1; ++i) {
+        d2psi[i] = (psi[i + 1] - 2.0 * psi[i] + psi[i - 1]) / (dx * dx);
+    }
+    // Bords : d2psi[0] et d2psi[N-1] restent à 0 (conforme à l’énoncé)
+
+    // Intégration par la méthode des trapèzes
+    double result = 0.0;
+    for (size_t i = 0; i < N - 1; ++i) {
+        result += 0.5 * dx * real(
+            conj(psi[i])     * (-hbar * hbar * d2psi[i]) +
+            conj(psi[i + 1]) * (-hbar * hbar * d2psi[i + 1])
+        );
+    }
+
+    return result;
+}
 
 // TODO calculer la normalization
 vec_cmplx normalize(const vec_cmplx& psi, const double& dx)

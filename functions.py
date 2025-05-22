@@ -105,9 +105,10 @@ def read_quantum_data(output_base):
 
         psi_raw = psi_raw.reshape((Nsteps, Npoints * 3))
 
-        
-        psi2 = psi_raw[:, 0::3]
-        return x, t, psi2, P_left, P_right, E, xmoy, x2moy, pmoy, p2moy
+        abs_psi = psi_raw[:, 0::3]
+        re_psi = psi_raw[:, 1::3]  # => Re(ψ)
+        im_psi = psi_raw[:, 2::3]  # => Im(ψ)
+        return x, t, abs_psi, re_psi, im_psi, P_left, P_right, E, xmoy, x2moy, pmoy, p2moy
     except Exception as e:
         print(f"Error reading quantum data: {e}")
         return None, None, None, None, None, None, None, None, None, None
