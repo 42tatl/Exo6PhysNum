@@ -198,6 +198,13 @@ vec_cmplx normalize(const vec_cmplx& psi, const double& dx)
     return psi_norm;
 }
 
+double uncertainty(vec_cmplx const& psi, vector<double> const& x, double dx, double hbar)
+{
+    double delta_x = sqrt(x2moy(psi, x, dx) - pow(xmoy(psi, x, dx),2));
+    double delta_p = sqrt(p2moy(psi, dx, hbar) - pow(pmoy(psi, dx, hbar),2));
+    return delta_x*delta_p;
+}
+
 int main(int argc, char** argv)
 {
     complex<double> complex_i = complex<double>(0, 1); // Nombre imaginaire i
@@ -345,6 +352,7 @@ int main(int argc, char** argv)
                     << " " << x2moy(psi, x, dx)
                     << " " << pmoy(psi, dx, hbar)
                     << " " << p2moy(psi, dx, hbar)
+                    << " " << uncertainty(psi, x, dx, hbar)
                     << endl;
 
     // Boucle temporelle :    
@@ -380,6 +388,7 @@ int main(int argc, char** argv)
                     << " " << x2moy(psi, x, dx)
                     << " " << pmoy(psi, dx, hbar)
                     << " " << p2moy(psi, dx, hbar)
+                    << " " << uncertainty(psi, x, dx, hbar)
                     << endl;
 
     } // Fin de la boucle temporelle

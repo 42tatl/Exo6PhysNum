@@ -27,13 +27,13 @@ Nsteps, Nintervals) = fct.get_simulation_params(params)
 
 # === Réponse à la question (i) ===
 t_trans = 0.035
-V0_values = [0.1, 0.5, 1.0, 2.0, 5.0]
-
+V0_values = np.linspace(150, 4000, 50)
+print(V0_values)
 E_over_V0 = []
 P_right_list = []
 
 for V0 in V0_values:
-    output_name = f"transmission_V0_{V0}"
+    output_name = f"6_4_V0_{V0}"
     params["V0"] = V0
     params["output"] = output_name
 
@@ -44,20 +44,20 @@ for V0 in V0_values:
 
     x, t, psi2, obs = fct.read_quantum_data(f"outputs/{output_name}")
 
+    print(psi2.shape)
     idx_trans = np.argmin(np.abs(t - t_trans))
     E_t = obs[idx_trans, 3]         # Energie moyenne
     P_right = obs[idx_trans, 2]     # Probabilité x > 0
 
     E_over_V0.append(E_t / V0)
     P_right_list.append(P_right)
-
+  
 # Tracer la courbe demandée
 plt.figure(figsize=(8, 5))
 plt.plot(E_over_V0, P_right_list, 'o-', label=r"$P_{x>0}(t_{\mathrm{trans}})$")
 plt.xlabel(r"$\langle E \rangle / V_0$")
-plt.ylabel(r"Probabilit\'e de transmission $P_{x>0}$")
-plt.title("Transmission en fonction de l'\u00e9nergie relative")
+plt.ylabel(r"Transmission Probability $P_{x>0}$")
 plt.grid(True)
 plt.legend()
-fct.save_figure("transmission_vs_EsurV0.pdf")
+fct.save_figure("6_4_EsurV0.pdf")
 plt.show()

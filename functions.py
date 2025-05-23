@@ -86,16 +86,36 @@ def get_simulation_params(params):
     )
 
 def read_quantum_data(output_base):
+    """
+    Lit les fichiers de sortie de la simulation quantique.
+    Retourne : x, t, psi2, obs
+    """
     try:
-        x = np.loadtxt(f"{output_base}_pot.out")[:, 0]
-        psi_raw = np.loadtxt(f"{output_base}_psi2.out")
+        # Lecture de la grille x depuis _pot.out (colonne 0)
+        pot_data = np.loadtxt(f"{output_base}_pot.out")
+        if pot_data.ndim == 1:
+            x = pot_data[0:1]  # cas bord (1 ligne)
+        else:
+            x = pot_data[:, 0]
+
+        # Lecture de psi^2 (chaque ligne = 1 pas de temps)
+        psi2 = np.loadtxt(f"{output_base}_psi2.out")
+        if psi2.ndim == 1:
+            psi2 = psi2.reshape((1, -1))
+
+        # Lecture des observables (col. 0 = t)
         obs = np.loadtxt(f"{output_base}_obs.out")
+        if obs.ndim == 1:
+            obs = obs.reshape((1, -1))
+
         t = obs[:, 0]
-        psi2 = psi_raw.reshape((len(t), len(x)))
+
         return x, t, psi2, obs
+
     except Exception as e:
-        print(f"Error reading quantum data: {e}")
+        print(f"[read_quantum_data] Failed to read data from {output_base}: {e}")
         return None, None, None, None
+
 
 def animate_quantum_psi(x, t, psi2, save_as=None):
     fig, ax = plt.subplots(figsize=(10, 6))
