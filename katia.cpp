@@ -1,6 +1,3 @@
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 #include "ConfigFile.tpp"
 #include <chrono>
 #include <cmath>
@@ -12,7 +9,9 @@
 #include <vector>
 
 using namespace std;
-typedef vector<complex<double>> vec_cmplx;
+typedef vector<complex<double> > vec_cmplx;
+
+double PI=3.1415926535897932384626433832795028841971e0;
 
 // Fonction resolvant le systeme d'equations A * solution = rhs
 // où A est une matrice tridiagonale
@@ -42,17 +41,33 @@ void triangular_solve(vector<T> const& diag,  vector<T> const& lower, vector<T> 
 }
 
 // TODO Potentiel V(x) :
-double V(double x, double xL, double xR, double xa, double xb, double V0, double om0, double m)
+double V(double xR, double xL, double xa, double xb, double V0, double om0, double x)
 {
-    if (x >= xL && x <= xa)
-        return 0.5 * m * om0 * om0 * pow((x - xa) / (xL - xa), 2);
-    else if (x >= xa && x <= xb)
-        return V0 * pow(sin(M_PI * (x - xa) / (xb - xa)), 2);
-    else if (x >= xb && x <= xR)
-        return 0.5 * m * om0 * om0 * pow((x - xb) / (xR - xb), 2);
+    const double eps = 1e-12;
+
+    // Cas harmonique pur sur tout le domaine
+    if (V0 == 0 && fabs(xa) < eps && fabs(xb) < eps) {
+        if (x < 0) {
+            return 0.5 * om0 * om0 * pow(x / (xL), 2);
+        } else {
+            return 0.5 * om0 * om0 * pow(x / (xR), 2);
+        }
+    }
+
+    
+    if (xL <= x && xa > x) {
+        return 0.5*om0*om0*((x-xa)/(xL-xa))*((x-xa)/(xL-xa));
+    } else if (x >= xa && x <= xb) {
+        return V0 * sin(PI*(x - xa) / (xb - xa))*sin(PI*(x - xa) / (xb - xa));
+    } else if (xb < x && xR >= x) {
+        return 0.5*om0*om0*((x-xb)/(xR-xb))*((x-xb)/(xR-xb));
+    }
     else
-        return 1e10;
+        return 10e10; // Potentiel infini
+
+    
 }
+
 
 // Declaration des diagnostiques de la particule d'apres sa fonction d'onde psi :
 //  - prob: calcule la probabilite de trouver la particule dans un intervalle [x_i, x_j]
@@ -64,106 +79,79 @@ double V(double x, double xL, double xR, double xa, double xb, double V0, double
 
 
 // TODO: calculer la probabilite de trouver la particule dans un intervalle [x_i, x_j]
-//JSP DU TOUT
-double prob(const vec_cmplx& psi, double xi, double xj, double dx, const std::vector<double>& x)
+double prob(double x_i, double x_j, vec_cmplx psi,vector<double> const& x, double const& dx)
 {
-    double p = 0.0;
-
-    // Trouver les indices correspondants à xi et xj
-    size_t i_start = 0;
-    size_t i_end = psi.size() - 1;
-
-    // Cherche l'index de départ (le plus proche de xi)
+    double probability = 0.0;
+    // Parcourir les points de maillage
     for (size_t i = 0; i < x.size() - 1; ++i) {
-        if (x[i] <= xi && x[i + 1] > xi) {
-            i_start = i;
-            break;
+        // Vérification  si le segment [x[i], x[i+1]] est dans l'intervalle [x_i, x_j]
+        if (x[i] >= x_i && x[i + 1] <= x_j) {
+            // Méthode des trapèzes : (|psi[i]|^2 + |psi[i+1]|^2) * dx / 2
+            probability += (std::norm(psi[i]) + std::norm(psi[i + 1])) * dx / 2.0;
         }
     }
 
-    // Cherche l'index de fin (le plus proche de xj)
-    for (size_t i = 0; i < x.size() - 1; ++i) {
-        if (x[i] <= xj && x[i + 1] > xj) {
-            i_end = i;
-            break;
-        }
-    }
-
-    if (i_start > i_end) std::swap(i_start, i_end);
-
-    for (size_t i = i_start; i < i_end; ++i) {
-        p += 0.5 * dx * (norm(psi[i]) + norm(psi[i + 1]));
-    }
-
-    return p;
+    return probability;
 }
 
 // TODO calculer l'energie
-double E(vec_cmplx psi, vec_cmplx dH, vec_cmplx aH, vec_cmplx cH, double dx)
+double E(vec_cmplx const& psi, vec_cmplx const& dH, vec_cmplx const& aH, vec_cmplx const& cH, double dx)
 {
     size_t N = psi.size();
-    vec_cmplx Hpsi(N, 0.0);
+    vec_cmplx H_psi(N, 0.0); // Vecteur pour stocker H * psi
 
+    // Appliquer H à psi
     for (size_t i = 0; i < N; ++i) {
-        Hpsi[i] = dH[i] * psi[i];
+        H_psi[i] = dH[i] * psi[i]; // Contribution de la diagonale principale
         if (i > 0) {
-            Hpsi[i] += aH[i - 1] * psi[i - 1];
+            H_psi[i] += aH[i - 1] * psi[i - 1]; // Contribution de la sous-diagonale
         }
         if (i < N - 1) {
-            Hpsi[i] += cH[i] * psi[i + 1];  //possible que c'est cH[i+1]
+            H_psi[i] += cH[i] * psi[i + 1]; // Contribution de la sur-diagonale
         }
     }
 
-    double E = 0.0;
+    // Calcul de l'énergie moyenne avec la méthode des trapèzes
+    double energy = 0.0;
     for (size_t i = 0; i < N - 1; ++i) {
-        E += 0.5 * dx * real(conj(psi[i]) * Hpsi[i] + conj(psi[i + 1]) * Hpsi[i + 1]);
+        // Méthode des trapèzes : (psi[i]* conj(H_psi[i]) + psi[i+1]* conj(H_psi[i+1])) * dx / 2
+        energy += 0.5 * dx * (real(conj(psi[i]) * H_psi[i]) + real(conj(psi[i + 1]) * H_psi[i + 1]));
     }
-
-    return E;
+    //cout<<"energy = " << energy << endl;
+    return energy;
 }
-
 
 // TODO calculer xmoyenne
 double xmoy(vec_cmplx const& psi, vector<double> const& x, double dx)
 {
-    double xm = 0.0;
-    for (size_t i = 0; i < psi.size() - 1; ++i) {
-        complex<double> integrand_i = conj(psi[i]) * x[i] * psi[i];
-        complex<double> integrand_i1 = conj(psi[i + 1]) * x[i+1] * psi[i + 1];
-        xm += 0.5 * dx * real(integrand_i + integrand_i1);
+    size_t N = psi.size();
+    double xmoyenne = 0.0;
+
+    // Calcul de la position moyenne avec la méthode des trapèzes
+    for (size_t i = 0; i < N - 1; ++i) {
+        // Méthode des trapèzes : (x[i] * |psi[i]|^2 + x[i+1] * |psi[i+1]|^2) * dx / 2
+        xmoyenne += 0.5 * dx * (x[i] * std::norm(psi[i]) + x[i + 1] * std::norm(psi[i + 1]));
     }
-    return xm;
+
+    return xmoyenne;
 }
 
 // TODO calculer x.^2 moyenne
 double x2moy(vec_cmplx const& psi, vector<double> const& x, double dx)
 {
-    double xm2 = 0.0;
-    for (size_t i = 0; i < psi.size() - 1; ++i) {
-        complex<double> integrand_i = conj(psi[i]) * x[i] * x[i] * psi[i];
-        complex<double> integrand_i1 = conj(psi[i + 1]) * x[i+1] * x[i+1] * psi[i + 1];
-        xm2 += 0.5 * dx * real(integrand_i + integrand_i1);
+    size_t N = psi.size();
+    double x2moyenne = 0.0;
+
+    // Calcul de la position moyenne avec la méthode des trapèzes
+    for (size_t i = 0; i < N - 1; ++i) {
+        // Méthode des trapèzes : (x[i] * |psi[i]|^2 + x[i+1] * |psi[i+1]|^2) * dx / 2
+        x2moyenne += 0.5 * dx * (x[i]*x[i] * std::norm(psi[i]) + x[i + 1]*x[i+1] * std::norm(psi[i + 1]));
     }
-    return xm2;
+
+    return x2moyenne;
 }
 
 // TODO calculer p moyenne
-/*
-double pmoy(const vec_cmplx& psi, double dx, double hbar)
-{
-    complex<double> complex_i(0.0, 1.0);
-    size_t N = psi.size();
-    double result = 0.0;
-
-    for (size_t i = 1; i < N - 1; ++i) {
-        complex<double> dpsi_dx = (psi[i + 1] - psi[i - 1]) / (2.0 * dx);
-        result += real(conj(psi[i]) * (-complex_i * hbar * dpsi_dx));
-    }
-
-    return dx * result;
-}
-*/
-
 double pmoy(vec_cmplx const& psi, double dx, double hbar)
 {
     size_t N = psi.size();
@@ -189,82 +177,85 @@ double pmoy(vec_cmplx const& psi, double dx, double hbar)
     return pmoyenne;
 }
 
-
-
 // TODO calculer p.^2 moyenne
-
-/*
-double p2moy(const vec_cmplx& psi, double dx, double hbar)
+double p2moy(vec_cmplx const& psi, double dx, double hbar)
 {
     size_t N = psi.size();
-    double result = 0.0;
-    double dx2 = dx * dx;
+    vec_cmplx d2psi_dx2(N, 0.0); // Vecteur pour stocker la dérivée seconde de psi
 
+    // Calcul de la dérivée seconde de psi
     for (size_t i = 1; i < N - 1; ++i) {
-        complex<double> d2psi = (psi[i + 1] - 2.0 * psi[i] + psi[i - 1]) / dx2;
-        result += real(conj(psi[i]) * (-hbar * hbar * d2psi));
+        d2psi_dx2[i] = (psi[i + 1] - 2.0 * psi[i] + psi[i - 1]) / (dx * dx); // Différences centrées
     }
+    d2psi_dx2[0] = 0.0; // Bord gauche : dérivée seconde nulle
+    d2psi_dx2[N - 1] = 0.0; // Bord droit : dérivée seconde nulle
 
-    return dx * result; 
-}
-*/
-
-double p2moy(const vec_cmplx& psi, double dx, double hbar)
-{
-    size_t N = psi.size();
-    std::vector<complex<double>> d2psi(N, 0.0); // dérivée seconde
-
-    // Calcul de la dérivée seconde avec différences finies centrées
-    for (size_t i = 1; i < N - 1; ++i) {
-        d2psi[i] = (psi[i + 1] - 2.0 * psi[i] + psi[i - 1]) / (dx * dx);
-    }
-    // Bords : d2psi[0] et d2psi[N-1] restent à 0 (conforme à l’énoncé)
-
-    // Intégration par la méthode des trapèzes
-    double result = 0.0;
+    // Calcul de p^2 moyen avec la méthode des trapèzes
+    double p2moyenne = 0.0;
     for (size_t i = 0; i < N - 1; ++i) {
-        result += 0.5 * dx * real(
-            conj(psi[i])     * (-hbar * hbar * d2psi[i]) +
-            conj(psi[i + 1]) * (-hbar * hbar * d2psi[i + 1])
+        // Contribution de chaque segment avec la méthode des trapèzes
+        p2moyenne += 0.5 * dx * (
+            real(conj(psi[i]) * (-hbar * hbar * d2psi_dx2[i])) +
+            real(conj(psi[i + 1]) * (-hbar * hbar * d2psi_dx2[i + 1]))
         );
     }
 
-    return result;
+    return p2moyenne;
 }
 
 // TODO calculer la normalization
-vec_cmplx normalize(const vec_cmplx& psi, const double& dx)
-{
-    double norm2 = 0.0;
+vec_cmplx normalize(vec_cmplx const& psi, double const& dx)
+{   
 
-    for (size_t i = 0; i < psi.size() - 1; ++i) {
-        norm2 += 0.5 * dx * (norm(psi[i]) + norm(psi[i + 1]));
-    }
 
-    double norm_factor = sqrt(norm2);
+    size_t N = psi.size();
+    double norm = 0.0;
 
-    vec_cmplx psi_norm(psi.size());
-    for (size_t i = 0; i < psi.size(); ++i) {
-        psi_norm[i] = psi[i] / norm_factor;
-    }
+    // Intégration avec la règle des trapèzes
+    norm += std::norm(psi[0]);
+    for (size_t i = 1; i < N - 1; ++i)
+        norm += 2.0 * std::norm(psi[i]);
+    norm += std::norm(psi[N - 1]);
+
+    norm *= dx / 2.0;
+    cout<<"norm = " << norm << endl;
+    // computing the constant of normailzation 
+    double C = 1.0 / sqrt(norm);
+
+    // initialization of the output vector 
+    vec_cmplx psi_norm(N);
+    //computing the output vector
+    for (size_t i = 0; i < N; ++i)
+        psi_norm[i] = C * psi[i];
+    
 
     return psi_norm;
 }
 
-double uncertainty(vec_cmplx const& psi, vector<double> const& x, double dx, double hbar)
+//function to compute l'incertitude de p et x 
+double delta_x(vec_cmplx const& psi, double dx, double hbar, vector<double> const& x)
 {
-    double delta_x = sqrt(x2moy(psi, x, dx) - pow(xmoy(psi, x, dx),2));
-    double delta_p = sqrt(p2moy(psi, dx, hbar) - pow(pmoy(psi, dx, hbar),2));
-    return delta_x*delta_p;
+    double x2moyenne= x2moy(psi, x, dx);
+    double xmoyenne= xmoy(psi, x, dx);
+    return sqrt(x2moyenne - xmoyenne * xmoyenne);
 }
 
-int main(int argc, char** argv)
+double delta_p(vec_cmplx const& psi, double dx, double hbar)
+{
+    double p2moyenne = p2moy(psi, dx, hbar);
+    double pmoyenne = pmoy(psi, dx, hbar);
+    return sqrt(p2moyenne - pmoyenne * pmoyenne);
+}
+
+
+
+int
+main(int argc, char** argv)
 {
     complex<double> complex_i = complex<double>(0, 1); // Nombre imaginaire i
-    complex<double> complex_1 = complex<double>(1.0, 0.0);
     const double PI = 3.1415926535897932384626433832795028841971e0;
 
-    string inputPath("configuration.in.example"); // Fichier d'input par defaut
+    string inputPath("configuration.in"); // Fichier d'input par defaut
     if (argc > 1) // Fichier d'input specifie par l'utilisateur ("./Exercice8 config_perso.in")
         inputPath = argv[1];
 
@@ -298,7 +289,8 @@ int main(int argc, char** argv)
     int Nintervals = configFile.get<int>("Nintervals");
 
     // TODO: initialiser le paquet d'onde, equation (4.116) du cours
-    double k0 = (2* PI * n) / (xR - xL);
+    double k0 = n * PI / (xR - xL); // k0 = n * pi / L
+
     int Npoints = Nintervals + 1;
     double dx = (xR - xL) / Nintervals;
     double dt = tfin / Nsteps;
@@ -319,7 +311,8 @@ int main(int argc, char** argv)
   
     // TODO initialize psi
     for (int i(0); i < Npoints; ++i)
-    	psi[i] = exp(complex_i*k0*x[i])*exp(-0.5*pow((x[i]-x0)/sigma0,2));;
+
+    	psi[i] = exp(complex<double>(0.0, k0 * x[i]))*exp(-(x[i]-x0)*(x[i]-x0)/(2.*sigma0*sigma0));
    
     // Modifications des valeurs aux bords :
     psi[0] = complex<double>(0., 0.);
@@ -327,6 +320,12 @@ int main(int argc, char** argv)
     
     // Normalisation :
     psi = normalize(psi, dx);
+    for (size_t i = 0; i < psi.size(); ++i) {
+        if (std::isnan(real(psi[i])) || std::isnan(imag(psi[i]))) {
+            std::cerr << "💥 psi[" << i << "] est NaN juste après initialisation." << std::endl;
+            exit(1);
+        }
+    }
 
     // Matrices (d: diagonale, a: sous-diagonale, c: sur-diagonale) :
     vec_cmplx dH(Npoints), aH(Nintervals), cH(Nintervals); // matrice Hamiltonienne
@@ -335,43 +334,50 @@ int main(int argc, char** argv)
     vec_cmplx dB(Npoints), aB(Nintervals),
       cB(Nintervals); // matrice du membre de droite de l'equation (4.100)
 
-    complex<double> a = complex_i * hbar * dt / (4.*m*dx*dx); // Coefficient complexe a de l'equation (4.100)
+    complex<double> a =
+      complex_i * hbar * dt / (4.*m*dx*dx); // Coefficient complexe a de l'equation (4.100)
 
     // TODO: calculer les éléments des matrices A, B et H.
     // Ces matrices sont stockées sous forme tridiagonale, d:diagonale, c et a: diagonales
     // supérieures et inférieures
     for (int i(0); i < Npoints; ++i) // Boucle sur les points de maillage
     {   
-        complex<double> b = (0.5 * complex_i * dt * V(x[i],xL,xR, xa, xb, V0, om0, m)) / hbar;
-        dH[i] = hbar*hbar/(m*dx*dx) + V(x[i],xL,xR, xa, xb, V0, om0, m);
-        dA[i]= complex_1 + 2.0*a + b;
-        dB[i]= complex_1 - 2.0*a - b;
-    } 
+        complex <double> b = complex_i  * dt * V(xR,xL,xa,xb,V0,om0,x[i])/ (2.* hbar);
+       
+        dH[i] = 1.0 / (m * dx * dx) + V(xR,xL,xa,xb,V0,om0,x[i]);
+        dA[i] = 1.0 +2.0*a + b;
+        dB[i] = 1.0 - 2.0*a - b;
+    }
     for (int i(0); i < Nintervals; ++i) // Boucle sur les intervalles
     {
-        aH[i] = -hbar*hbar/(2.0*m*dx*dx);
+        aH[i] = - 1.0/(2.0*m*dx*dx); // hbar = 1;
         aA[i] = -a;
         aB[i] = a;
-        cH[i] = -hbar*hbar/(2.0*m*dx*dx);
+        cH[i] = - 1.0/(2.0*m*dx*dx); // hbar = 1
         cA[i] = -a;
         cB[i] = a;
     }
 
     // Conditions aux limites: psi nulle aux deux bords
     // TODO: Modifier les matrices A et B pour satisfaire les conditions aux limites
-    aA.front()=0.0;
-    dA.front()=complex_1;
-    cA.front()=0.0;
-    aA.back()=0.0;
-    dA.back()=complex_1;
-    cA.back()=0.0;
+    dA[0] = 1.;
+    cA[0] = 0.;
+    aA[0] = 0.;
+    dA[Npoints - 1] = 1.;
+    aA[Npoints - 2] = 0.;
+    cA[Npoints - 2] = 0.;
 
-    aB.front()=0.0;
-    dB.front()=complex_1;
-    cB.front()=0.0;
-    aB.back()=0.0;
-    dB.back()=complex_1;
-    cB.back()=0.0;
+    dB[0] = 1.;
+    cB[0] = 0.;
+    aB[0] = 0.;
+    dB[Npoints - 1] = 1.;
+    aB[Npoints - 2] = 0.;
+    cB[Npoints - 2] = 0.;
+
+
+
+
+
 
     // Fichiers de sortie :
     string output = configFile.get<string>("output");
@@ -379,7 +385,7 @@ int main(int argc, char** argv)
     ofstream fichier_potentiel((output + "_pot.out").c_str());
     fichier_potentiel.precision(15);
     for (int i(0); i < Npoints; ++i)
-        fichier_potentiel << x[i] << " " << V(x[i] ,xL,xR, xa,xb,  V0,  om0, m) << endl;
+        fichier_potentiel << x[i] << " " <<V(xR,xL,xa,xb,V0,om0,x[i]) << endl;
     fichier_potentiel.close();
 
     ofstream fichier_psi((output + "_psi2.out").c_str());
@@ -390,6 +396,7 @@ int main(int argc, char** argv)
 
     // t0 writing
     for (int i(0); i < Npoints; ++i){
+        
         fichier_psi << abs(psi[i])  << " " << real(psi[i]) << " "  << imag(psi[i]) << " ";
         }
     fichier_psi << endl;
@@ -397,16 +404,9 @@ int main(int argc, char** argv)
     // Ecriture des observables :
     // TODO: introduire les arguments des fonctions prob, E, xmoy, x2moy, pmoy et p2moy
     //       en accord avec la façon dont vous les aurez programmés plus haut
-    fichier_observables << t
-                    << " " << prob(psi, xL, 0.0, dx, x)
-                    << " " << prob(psi, 0.0, xR, dx, x)
-                    << " " << E(psi, dH, aH, cH, dx)
-                    << " " << xmoy(psi, x, dx)
-                    << " " << x2moy(psi, x, dx)
-                    << " " << pmoy(psi, dx, hbar)
-                    << " " << p2moy(psi, dx, hbar)
-                    << " " << uncertainty(psi, x, dx, hbar)
-                    << endl;
+    fichier_observables << t << " " << prob(xL, 0, psi, x, dx) << " " << prob(0, xR, psi, x, dx)
+                << " " << E(psi,  dH,  aH,  cH, dx) << " " << xmoy (psi, x, dx) << " "  
+                << x2moy(psi, x, dx) << " " << pmoy (psi, dx, hbar) << " " << p2moy(psi, dx, hbar)<< " " << delta_x( psi,  dx, hbar, x) << " " << delta_p( psi,  dx, hbar)<<endl; 
 
     // Boucle temporelle :    
     while (t < tfin) {
@@ -433,19 +433,15 @@ int main(int argc, char** argv)
         // Ecriture des observables :
 	// TODO: introduire les arguments des fonctions prob, E, xmoy, x2moy, pmoy et p2moy
 	//       en accord avec la façon dont vous les aurez programmés plus haut
-        fichier_observables << t
-                    << " " << prob(psi, xL, 0.0, dx, x)
-                    << " " << prob(psi, 0.0, xR, dx, x)
-                    << " " << E(psi, dH, aH, cH, dx)
-                    << " " << xmoy(psi, x, dx)
-                    << " " << x2moy(psi, x, dx)
-                    << " " << pmoy(psi, dx, hbar)
-                    << " " << p2moy(psi, dx, hbar)
-                    << " " << uncertainty(psi, x, dx, hbar)
-                    << endl;
-
+        fichier_observables << t << " " << prob(xL, 0, psi, x, dx) << " " << prob(0, xR, psi, x, dx)
+                    << " " << E(psi,  dH,  aH,  cH, dx) << " " << xmoy (psi, x, dx) << " "  
+                    << x2moy(psi, x,dx) << " " << pmoy (psi, dx, hbar) << " " << p2moy(psi, dx, hbar)<< " " << delta_x( psi,  dx, hbar, x) << " " << delta_p( psi,  dx, hbar) << endl; 
+        
     } // Fin de la boucle temporelle
-    
+
+
+
+
 
     fichier_observables.close();
     fichier_psi.close();

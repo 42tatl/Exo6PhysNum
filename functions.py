@@ -109,12 +109,30 @@ def read_quantum_data(output_base):
             obs = obs.reshape((1, -1))
 
         t = obs[:, 0]
+        P_left = obs[:, 1]   # Probabilité x < 0
+        P_right = obs[:, 2]  # Probabilité x > 0
+        E = obs[:, 3]        # Energie moyenne
+        xmoy = obs[:, 4]     # Position moyenne
+        x2moy = obs[:, 5]    # Position carrée moyenne
+        pmoy = obs[:, 6]     # Quantité de mouvement moyenne
+        p2moy = obs[:, 7]    # Quantité de mouvement carrée moyenne
 
-        return x, t, psi2, obs
+        psi_raw = np.loadtxt(f"{output_base}_psi2.out")
+        Npoints = len(x)
+        Nsteps = len(t)
 
+        psi_raw = psi_raw.reshape((Nsteps, Npoints * 3))
+
+        abs_psi = psi_raw[:, 0::3]
+        re_psi = psi_raw[:, 1::3]  # => Re(ψ)
+        im_psi = psi_raw[:, 2::3]  # => Im(ψ)
+        return x, t, abs_psi, re_psi, im_psi, P_left, P_right, E, xmoy, x2moy, pmoy, p2moy
     except Exception as e:
-        print(f"[read_quantum_data] Failed to read data from {output_base}: {e}")
-        return None, None, None, None
+        print(f"Error reading quantum data: {e}")
+        return None, None, None, None, None, None, None, None, None, None
+    
+
+
 
 
 def animate_quantum_psi(x, t, psi2, save_as=None):
