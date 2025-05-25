@@ -4,7 +4,7 @@ import os
 import functions as fct
 
 
-executable = './Exe_katia'  # Remove .exe for Mac
+executable = './Exe'  # Remove .exe for Mac
 repertoire = r"/Users/lilimouelle/Desktop/PHYSNUM/Exo6PhysNum"  # Modify for correct directory
 os.chdir(repertoire)
 output_name = "transmission_6_3"

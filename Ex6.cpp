@@ -44,14 +44,13 @@ void triangular_solve(vector<T> const& diag,  vector<T> const& lower, vector<T> 
 // TODO Potentiel V(x) :
 double V(double x, double xL, double xR, double xa, double xb, double V0, double om0, double m)
 {
-    if (x >= xL && x <= xa)
-        return 0.5 * m * om0 * om0 * pow((x - xa) / (xL - xa), 2);
-    else if (x >= xa && x <= xb)
-        return V0 * pow(sin(M_PI * (x - xa) / (xb - xa)), 2);
-    else if (x >= xb && x <= xR)
-        return 0.5 * m * om0 * om0 * pow((x - xb) / (xR - xb), 2);
+    if (x >= xL and x < xa) { return 0.5 * om0 * om0 * pow((x - xa) / (1 - xa/xL), 2); }
+
+    else if (x >= xa and x < xb) { return V0 * pow(sin(M_PI * (x - xa) / (xb - xa)), 2); }
+    
+    else if (x >= xb and x <= xR) { return 0.5 * om0 * om0 * pow((x - xb) / (1 - xb/xR), 2); }
     else
-        return 1e10;
+        return 10e10; // Potentiel infini
 }
 
 // Declaration des diagnostiques de la particule d'apres sa fonction d'onde psi :
@@ -99,6 +98,8 @@ double prob(const vec_cmplx& psi, double xi, double xj, double dx, const std::ve
 }
 
 // TODO calculer l'energie
+
+/*
 double E(vec_cmplx psi, vec_cmplx dH, vec_cmplx aH, vec_cmplx cH, double dx)
 {
     size_t N = psi.size();
@@ -121,9 +122,43 @@ double E(vec_cmplx psi, vec_cmplx dH, vec_cmplx aH, vec_cmplx cH, double dx)
 
     return E;
 }
+*/
+
+double E(vec_cmplx psi, vec_cmplx dH, vec_cmplx aH, vec_cmplx cH, double dx)
+{
+    double energy = 0.0;
+    int N = psi.size();
+
+    // Calcul de H psi (matrice tridiagonale)
+    vec_cmplx H_psi(N, 0.0);
+    for (int i = 0; i < N; ++i) {
+        H_psi[i] = dH[i] * psi[i];
+        if (i > 0)  { 
+            H_psi[i] += aH[i-1] * psi[i-1]; 
+        }
+        if (i < N-1)  {
+            H_psi[i] += cH[i] * psi[i+1]; 
+        }
+    }
+
+    
+    for (int i = 0; i < N; ++i) {
+        double contrib = real(conj(psi[i]) * H_psi[i]); 
+        if (i == 0 || i == N-1) {
+            energy += 0.5 * contrib;
+        } else {
+            energy += contrib;
+        }
+    }
+    energy *= dx; 
+
+    return energy;
+}
 
 
 // TODO calculer xmoyenne
+
+/*
 double xmoy(vec_cmplx const& psi, vector<double> const& x, double dx)
 {
     double xm = 0.0;
@@ -134,8 +169,30 @@ double xmoy(vec_cmplx const& psi, vector<double> const& x, double dx)
     }
     return xm;
 }
+*/
+
+double xmoy(vec_cmplx const& psi, vector<double> const& x, double dx) 
+{
+    double moy = 0.0;
+    size_t N = psi.size();
+    
+    // intégration avec méthode des trapèzes
+    for (size_t i = 0; i < N; ++i) {
+        double psi2 = real(conj(psi[i]) * psi[i]); 
+        double contrib = psi2 * x[i];
+        if (i == 0 || i == N-1) {
+            moy += 0.5 * contrib; 
+        } else {
+            moy += contrib;
+        }
+    }
+    moy *= dx;
+    
+    return moy;
+}
 
 // TODO calculer x.^2 moyenne
+/*
 double x2moy(vec_cmplx const& psi, vector<double> const& x, double dx)
 {
     double xm2 = 0.0;
@@ -146,104 +203,117 @@ double x2moy(vec_cmplx const& psi, vector<double> const& x, double dx)
     }
     return xm2;
 }
-
-// TODO calculer p moyenne
-/*
-double pmoy(const vec_cmplx& psi, double dx, double hbar)
-{
-    complex<double> complex_i(0.0, 1.0);
-    size_t N = psi.size();
-    double result = 0.0;
-
-    for (size_t i = 1; i < N - 1; ++i) {
-        complex<double> dpsi_dx = (psi[i + 1] - psi[i - 1]) / (2.0 * dx);
-        result += real(conj(psi[i]) * (-complex_i * hbar * dpsi_dx));
-    }
-
-    return dx * result;
-}
 */
 
-double pmoy(vec_cmplx const& psi, double dx, double hbar)
+double x2moy(vec_cmplx const& psi, vector<double> const& x, double dx) 
 {
+    double moy2 = 0.0;
     size_t N = psi.size();
-    vec_cmplx dpsi_dx(N, 0.0); // Vecteur pour stocker la dérivée spatiale de psi
-
-    // Calcul de la dérivée spatiale de psi
-    for (size_t i = 1; i < N - 1; ++i) {
-        dpsi_dx[i] = (psi[i + 1] - psi[i - 1]) / (2.0 * dx); // Différences centrées
+    
+    // intégration avec méthode des trapèzes
+    for (size_t i = 0; i < N; ++i) {
+        double psi2 = real(conj(psi[i]) * psi[i]); 
+        double contrib = psi2 * x[i] * x[i];
+        if (i == 0 || i == N-1) { 
+            moy2 += 0.5 * contrib;
+        } 
+        else { 
+            moy2 += contrib; 
+        }
     }
-    dpsi_dx[0] = (psi[1] - psi[0]) / dx; // Différences forward pour le bord gauche
-    dpsi_dx[N - 1] = (psi[N - 1] - psi[N - 2]) / dx; // Différences backward pour le bord droit
-
-    // Calcul de la quantité de mouvement moyenne avec la méthode des trapèzes
-    double pmoyenne = 0.0;
-    for (size_t i = 0; i < N - 1; ++i) {
-        // Contribution de chaque segment avec la méthode des trapèzes
-        pmoyenne += 0.5 * dx * (
-            real(conj(psi[i]) * (-complex<double>(0, 1) * hbar * dpsi_dx[i])) +
-            real(conj(psi[i + 1]) * (-complex<double>(0, 1) * hbar * dpsi_dx[i + 1]))
-        );
-    }
-
-    return pmoyenne;
+    moy2 *= dx;
+    
+    return moy2;
 }
 
+// TODO calculer p moyenne
+
+const complex<double> complex_i(0, 1);
+double pmoy(vec_cmplx const& psi, double dx, double hbar) 
+{
+    double moy = 0.0;
+    size_t N = psi.size();
+    
+    for (size_t i = 0; i < N; ++i) {
+        
+        complex<double> dpsi_dx; //différences finies pour la dérivée de psi
+        if (i == 0) { 
+            dpsi_dx = (psi[i+1] - psi[i]) / dx; 
+        } //forward à gauche  
+        else if (i == N-1) { 
+            dpsi_dx = (psi[i] - psi[i-1]) / dx; 
+        } //backward à droite 
+        else { 
+            dpsi_dx = (psi[i+1] - psi[i-1]) / (2.0 * dx); 
+        } // Différence centrée
+        
+        double contrib = real(conj(psi[i]) * (-complex_i * hbar * dpsi_dx)); // fonction dans l'intégrale
+        
+        //trapèzes
+        if (i == 0 || i == N-1) {
+            moy += 0.5 * contrib;
+        } else {
+            moy += contrib;
+        }
+    }
+    moy *= dx; 
+    
+    return moy;
+}
 
 
 // TODO calculer p.^2 moyenne
 
-/*
-double p2moy(const vec_cmplx& psi, double dx, double hbar)
+double p2moy(vec_cmplx const& psi, double const& dx, double const& hbar) 
 {
+    double moy = 0.0;
     size_t N = psi.size();
-    double result = 0.0;
-    double dx2 = dx * dx;
-
-    for (size_t i = 1; i < N - 1; ++i) {
-        complex<double> d2psi = (psi[i + 1] - 2.0 * psi[i] + psi[i - 1]) / dx2;
-        result += real(conj(psi[i]) * (-hbar * hbar * d2psi));
+    
+    for (size_t i = 0; i < N; ++i) {
+        complex<double> d2psi_dx2;
+        if (i == 0 || i == N-1)
+            { 
+                d2psi_dx2 = 0.0; 
+            } 
+        else 
+            { 
+                d2psi_dx2 = (psi[i+1] - 2.0*psi[i] + psi[i-1]) / (dx * dx); 
+            } 
+        
+        double contrib = real(conj(psi[i]) * (-hbar * hbar * d2psi_dx2)); 
+        
+        //trapèzes
+        if (i == 0 || i == N-1) {
+            moy += 0.5 * contrib;
+        } else {
+            moy += contrib;
+        }
     }
-
-    return dx * result; 
-}
-*/
-
-double p2moy(const vec_cmplx& psi, double dx, double hbar)
-{
-    size_t N = psi.size();
-    std::vector<complex<double>> d2psi(N, 0.0); // dérivée seconde
-
-    // Calcul de la dérivée seconde avec différences finies centrées
-    for (size_t i = 1; i < N - 1; ++i) {
-        d2psi[i] = (psi[i + 1] - 2.0 * psi[i] + psi[i - 1]) / (dx * dx);
-    }
-    // Bords : d2psi[0] et d2psi[N-1] restent à 0 (conforme à l’énoncé)
-
-    // Intégration par la méthode des trapèzes
-    double result = 0.0;
-    for (size_t i = 0; i < N - 1; ++i) {
-        result += 0.5 * dx * real(
-            conj(psi[i])     * (-hbar * hbar * d2psi[i]) +
-            conj(psi[i + 1]) * (-hbar * hbar * d2psi[i + 1])
-        );
-    }
-
-    return result;
+    moy *= dx;
+    
+    return moy;
 }
 
 // TODO calculer la normalization
-vec_cmplx normalize(const vec_cmplx& psi, const double& dx)
+vec_cmplx normalize(vec_cmplx const& psi, double const& dx)
 {
-    double norm2 = 0.0;
-
-    for (size_t i = 0; i < psi.size() - 1; ++i) {
-        norm2 += 0.5 * dx * (norm(psi[i]) + norm(psi[i + 1]));
-    }
-
-    double norm_factor = sqrt(norm2);
-
     vec_cmplx psi_norm(psi.size());
+    double norm2 = 0.0;
+    
+    for (size_t i = 0; i < psi.size(); ++i) {
+        double contrib = norm(psi[i]); 
+
+        // méthode des trapèzes
+        if (i == 0 || i == psi.size()-1) {
+            norm2 += 0.5 * contrib; 
+        } else {
+            norm2 += contrib;
+        }
+    }
+    norm2 *= dx;
+
+    // normalisation
+    double norm_factor = sqrt(norm2); 
     for (size_t i = 0; i < psi.size(); ++i) {
         psi_norm[i] = psi[i] / norm_factor;
     }
@@ -319,7 +389,8 @@ int main(int argc, char** argv)
   
     // TODO initialize psi
     for (int i(0); i < Npoints; ++i)
-    	psi[i] = exp(complex_i*k0*x[i])*exp(-0.5*pow((x[i]-x0)/sigma0,2));;
+    	psi[i] = exp(complex_i*k0*x[i])*exp(-0.5*pow((x[i]-x0)/sigma0,2));
+
    
     // Modifications des valeurs aux bords :
     psi[0] = complex<double>(0., 0.);
@@ -342,36 +413,35 @@ int main(int argc, char** argv)
     // supérieures et inférieures
     for (int i(0); i < Npoints; ++i) // Boucle sur les points de maillage
     {   
-        complex<double> b = (0.5 * complex_i * dt * V(x[i],xL,xR, xa, xb, V0, om0, m)) / hbar;
         dH[i] = hbar*hbar/(m*dx*dx) + V(x[i],xL,xR, xa, xb, V0, om0, m);
-        dA[i]= complex_1 + 2.0*a + b;
-        dB[i]= complex_1 - 2.0*a - b;
+        dA[i]= complex_1 + 2.0*a + (0.5 * complex_i * dt * V(x[i],xL,xR, xa, xb, V0, om0, m)) / hbar;
+        dB[i] = -dA[i] + 2.;
     } 
     for (int i(0); i < Nintervals; ++i) // Boucle sur les intervalles
     {
         aH[i] = -hbar*hbar/(2.0*m*dx*dx);
         aA[i] = -a;
         aB[i] = a;
-        cH[i] = -hbar*hbar/(2.0*m*dx*dx);
+        cH[i] = aH[i];
         cA[i] = -a;
         cB[i] = a;
     }
 
     // Conditions aux limites: psi nulle aux deux bords
-    // TODO: Modifier les matrices A et B pour satisfaire les conditions aux limites
-    aA.front()=0.0;
-    dA.front()=complex_1;
-    cA.front()=0.0;
-    aA.back()=0.0;
-    dA.back()=complex_1;
-    cA.back()=0.0;
-
-    aB.front()=0.0;
-    dB.front()=complex_1;
-    cB.front()=0.0;
-    aB.back()=0.0;
-    dB.back()=complex_1;
-    cB.back()=0.0;
+    // TODO: Modifier les matrices A et B pour satisfaire les conditions aux limites 
+    dA[0] = complex_1;
+    cA[0] = 0.;
+    aA[0] = 0.;
+    dA[Npoints-1] = complex_1;
+    aA[Nintervals-1] = 0.;
+    cA[Nintervals-1] = 0.;
+    
+    dB[0] = complex_1;
+    cB[0] = 0.;
+    aB[0] = 0.;
+    dB[Npoints-1] = complex_1;
+    aB[Nintervals-1] = 0.;
+    cB[Nintervals-1] = 0.;
 
     // Fichiers de sortie :
     string output = configFile.get<string>("output");
