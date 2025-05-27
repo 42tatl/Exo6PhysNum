@@ -116,6 +116,7 @@ def read_quantum_data(output_base):
         x2moy = obs[:, 5]    # Position carrée moyenne
         pmoy = obs[:, 6]     # Quantité de mouvement moyenne
         p2moy = obs[:, 7]    # Quantité de mouvement carrée moyenne
+        uncertainty = obs[:, 8] 
 
         psi_raw = np.loadtxt(f"{output_base}_psi2.out")
         Npoints = len(x)
@@ -126,11 +127,10 @@ def read_quantum_data(output_base):
         abs_psi = psi_raw[:, 0::3]
         re_psi = psi_raw[:, 1::3]  # => Re(ψ)
         im_psi = psi_raw[:, 2::3]  # => Im(ψ)
-        return x, t, abs_psi, re_psi, im_psi, P_left, P_right, E, xmoy, x2moy, pmoy, p2moy
+        return x, t, abs_psi, re_psi, im_psi, P_left, P_right, E, xmoy, x2moy, pmoy, p2moy, uncertainty
     except Exception as e:
         print(f"Error reading quantum data: {e}")
-        return None, None, None, None, None, None, None, None, None, None
-    
+        return None, None, None, None, None, None, None, None, None, None, None, None, None
 
 
 

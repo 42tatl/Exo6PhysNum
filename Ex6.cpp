@@ -98,32 +98,6 @@ double prob(const vec_cmplx& psi, double xi, double xj, double dx, const std::ve
 }
 
 // TODO calculer l'energie
-
-/*
-double E(vec_cmplx psi, vec_cmplx dH, vec_cmplx aH, vec_cmplx cH, double dx)
-{
-    size_t N = psi.size();
-    vec_cmplx Hpsi(N, 0.0);
-
-    for (size_t i = 0; i < N; ++i) {
-        Hpsi[i] = dH[i] * psi[i];
-        if (i > 0) {
-            Hpsi[i] += aH[i - 1] * psi[i - 1];
-        }
-        if (i < N - 1) {
-            Hpsi[i] += cH[i] * psi[i + 1];  //possible que c'est cH[i+1]
-        }
-    }
-
-    double E = 0.0;
-    for (size_t i = 0; i < N - 1; ++i) {
-        E += 0.5 * dx * real(conj(psi[i]) * Hpsi[i] + conj(psi[i + 1]) * Hpsi[i + 1]);
-    }
-
-    return E;
-}
-*/
-
 double E(vec_cmplx psi, vec_cmplx dH, vec_cmplx aH, vec_cmplx cH, double dx)
 {
     double energy = 0.0;
@@ -158,19 +132,6 @@ double E(vec_cmplx psi, vec_cmplx dH, vec_cmplx aH, vec_cmplx cH, double dx)
 
 // TODO calculer xmoyenne
 
-/*
-double xmoy(vec_cmplx const& psi, vector<double> const& x, double dx)
-{
-    double xm = 0.0;
-    for (size_t i = 0; i < psi.size() - 1; ++i) {
-        complex<double> integrand_i = conj(psi[i]) * x[i] * psi[i];
-        complex<double> integrand_i1 = conj(psi[i + 1]) * x[i+1] * psi[i + 1];
-        xm += 0.5 * dx * real(integrand_i + integrand_i1);
-    }
-    return xm;
-}
-*/
-
 double xmoy(vec_cmplx const& psi, vector<double> const& x, double dx) 
 {
     double moy = 0.0;
@@ -192,18 +153,6 @@ double xmoy(vec_cmplx const& psi, vector<double> const& x, double dx)
 }
 
 // TODO calculer x.^2 moyenne
-/*
-double x2moy(vec_cmplx const& psi, vector<double> const& x, double dx)
-{
-    double xm2 = 0.0;
-    for (size_t i = 0; i < psi.size() - 1; ++i) {
-        complex<double> integrand_i = conj(psi[i]) * x[i] * x[i] * psi[i];
-        complex<double> integrand_i1 = conj(psi[i + 1]) * x[i+1] * x[i+1] * psi[i + 1];
-        xm2 += 0.5 * dx * real(integrand_i + integrand_i1);
-    }
-    return xm2;
-}
-*/
 
 double x2moy(vec_cmplx const& psi, vector<double> const& x, double dx) 
 {
